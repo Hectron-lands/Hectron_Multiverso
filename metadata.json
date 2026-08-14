@@ -1,0 +1,6 @@
+{
+  "name": "Hectron Universe",
+  "description": "Streamer dashboard and companion app for HECTRON LIVE UNIVERSE.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
