@@ -1,0 +1,3 @@
+console.log('HECTRON MULTIVERSO Overlay loaded');
+function updateResources(r) { if(r.iron!==undefined) document.getElementById('resource-iron').textContent=r.iron; if(r.gold!==undefined) document.getElementById('resource-gold').textContent=r.gold; if(r.crystal!==undefined) document.getElementById('resource-crystal').textContent=r.crystal; }
+setTimeout(() => { updateResources({iron:150,gold:75,crystal:25}); }, 1000);
