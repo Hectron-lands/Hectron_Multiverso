@@ -15,7 +15,7 @@
     "dotenv": "^16.3.1"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   },
   "author": "Abadalabs, Inc.",
   "license": "MIT"
