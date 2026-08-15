@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autonomy-service
+  namespace: hectron
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: autonomy-service
+  template:
+    metadata:
+      labels:
+        app: autonomy-service
+    spec:
+      containers:
+      - name: autonomy-service
+        image: gcr.io/abadalabs-hectron-prod/hectron-autonomy-service:latest
+        ports:
+        - containerPort: 3001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: autonomy-service
+  namespace: hectron
+spec:
+  selector:
+    app: autonomy-service
+  ports:
+  - port: 3001
+    targetPort: 3001
+  type: ClusterIP
