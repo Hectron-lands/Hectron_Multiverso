@@ -1,0 +1,11 @@
+name: Deploy to Staging
+on:
+  push:
+    branches: [ dev, staging ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Deploy
+      run: echo "Staging deployment triggered"
