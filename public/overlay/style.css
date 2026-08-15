@@ -1,0 +1,11 @@
+:root { --primary-color: #00ff88; --background-color: rgba(0, 0, 0, 0.7); --text-color: #ffffff; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; color: var(--text-color); background: transparent; height: 100vh; overflow: hidden; }
+#overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr; gap: 10px; padding: 15px; }
+.header { background: var(--background-color); border-radius: 10px; padding: 10px 20px; text-align: center; }
+.logo { font-size: 1.8rem; color: var(--primary-color); font-weight: bold; }
+.main-content { display: grid; grid-template-columns: 250px 1fr 250px; gap: 15px; height: 100%; }
+.panel { background: var(--background-color); border-radius: 10px; padding: 15px; }
+.panel-header { font-size: 0.9rem; color: var(--primary-color); margin-bottom: 10px; text-transform: uppercase; }
+.resource-item, .stat-item { display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; }
+.scene-message { font-size: 2rem; color: var(--primary-color); text-align: center; margin: auto; }
