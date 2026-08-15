@@ -1,30 +1,37 @@
 #!/usr/bin/env python3
 # HECTRON-01: memory_os.py
-# Subsistema MemoryOS con categorización multi-capa y Verificador ASTAROTH
+# Subsistema MemoryOS de Alto Rendimiento con Verificador ASTAROTH y Consolidación
 
 import sqlite3
 import os
 import uuid
 import time
 from datetime import datetime
+from .db_bootstrap import get_optimized_connection
 
 class MemoryOS:
     """
-    Gestor de memoria persistente multicapa:
-    1. Episódica: Hechos concretos y cronológicos.
-    2. Semántica: Conocimiento general y perfiles.
-    3. Procedimental: Habilidades y protocolos.
-    4. Social: Vínculos, confianza y asimetrías de poder.
+    Gestor de memoria persistente multicapa optimizado para Edge:
+    - Conexiones persistentes WAL de alta velocidad
+    - Filtrado indexado en tiempo real
+    - Módulo de verificación de contradicciones ASTAROTH
+    - Consolidación y decaimiento temporal
     """
     def __init__(self, db_path=None):
         self.db_path = db_path or os.path.join(os.getcwd(), "hectron_genesis/data/hectron_core.db")
+        self._conn = None
+
+    def _get_conn(self):
+        if self._conn is None:
+            self._conn = get_optimized_connection(self.db_path)
+        return self._conn
 
     def store_memory(self, agent_id, content, memory_type="episodic", confidence=1.0, salience=0.8, provenance="SensoryInput", privacy_class="SOVEREIGN"):
         memory_id = f"mem_{uuid.uuid4().hex[:12]}"
         timestamp = datetime.utcnow().isoformat()
         decay = 0.05  # Tasa de decaimiento temporal
 
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_conn()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO memory_store 
@@ -32,13 +39,13 @@ class MemoryOS:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (memory_id, agent_id, content, memory_type, confidence, salience, provenance, timestamp, decay, privacy_class))
         conn.commit()
-        conn.close()
+        cursor.close()
 
         return memory_id
 
     def retrieve(self, agent_id, query_type=None, min_confidence=0.5, limit=10):
-        """Recupera recuerdos filtrados y ordenados por relevancia/salience."""
-        conn = sqlite3.connect(self.db_path)
+        """Recupera recuerdos filtrados y ordenados por relevancia/salience a través de índices."""
+        conn = self._get_conn()
         cursor = conn.cursor()
 
         if query_type:
@@ -59,7 +66,7 @@ class MemoryOS:
             """, (agent_id, min_confidence, limit))
 
         rows = cursor.fetchall()
-        conn.close()
+        cursor.close()
 
         memories = []
         for r in rows:
@@ -74,12 +81,24 @@ class MemoryOS:
             })
         return memories
 
+    def consolidate_and_decay(self, agent_id):
+        """Aplica decaimiento temporal a memorias antiguas y poda salience residual."""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE memory_store
+            SET salience = MAX(0.05, salience * (1.0 - decay))
+            WHERE agent_id = ? AND salience > 0.05
+        """, (agent_id,))
+        conn.commit()
+        cursor.close()
+
     def astaroth_verify(self, agent_id, proposed_action):
         """
-        Módulo ASTAROTH:
-        1. Verifica contradicciones entre la memoria episódica y la acción propuesta.
-        2. Separa hechos confiables de inferencias débiles.
-        3. Valida la procedencia.
+        Módulo ASTAROTH Optimizado:
+        1. Verifica contradicciones entre la memoria episódica reciente y la acción propuesta.
+        2. Separa hechos observables de conjeturas no fundamentadas.
+        3. Genera índice numérico de confiabilidad (0.0 a 1.0).
         """
         recent_memories = self.retrieve(agent_id, limit=20)
         contradictions = []
@@ -87,8 +106,10 @@ class MemoryOS:
         action_str = str(proposed_action).lower()
         for mem in recent_memories:
             c = mem["content"].lower()
-            if "falló" in c or "fracasó" in c or "vetado" in c:
-                if any(word in action_str for word in c.split() if len(word) > 4):
+            if any(k in c for k in ("falló", "fracasó", "vetado", "abortado", "error")):
+                # Verificar intersección de palabras clave
+                keywords = [w for w in c.split() if len(w) > 4]
+                if any(kw in action_str for kw in keywords):
                     contradictions.append(f"Contradicción con memoria {mem['memory_id']}: '{mem['content']}'")
 
         is_valid = len(contradictions) == 0
@@ -106,5 +127,6 @@ if __name__ == "__main__":
     mos = MemoryOS()
     mem_id = mos.store_memory("HECTRON_CORE_01", "Acuerdo comercial con Nodo-7 completado con éxito.", "episodic", 0.95, 0.9)
     print(f"[+] Recuerdo guardado: {mem_id}")
+    mos.consolidate_and_decay("HECTRON_CORE_01")
     verification = mos.astaroth_verify("HECTRON_CORE_01", "Iniciar nuevo acuerdo con Nodo-7")
     print(f"[+] Verificación ASTAROTH: {verification}")

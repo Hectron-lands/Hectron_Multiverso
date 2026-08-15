@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # HECTRON-01: social_matrix.py
-# Motor de Dinámicas de Poder Estructural y Matriz Social
+# Motor de Dinámicas de Poder Estructural y Matriz Social Optimizado
 
 import sqlite3
 import os
 import math
 from datetime import datetime
+from .db_bootstrap import get_optimized_connection
 
 class SocialMatrix:
     """
@@ -18,6 +19,13 @@ class SocialMatrix:
     """
     def __init__(self, db_path=None):
         self.db_path = db_path or os.path.join(os.getcwd(), "hectron_genesis/data/hectron_core.db")
+        self._conn = None
+        self._cache = {}
+
+    def _get_conn(self):
+        if self._conn is None:
+            self._conn = get_optimized_connection(self.db_path)
+        return self._conn
 
     def calculate_structural_power(self, resource_control, info_asymmetry, batna_score, network_centrality):
         """
@@ -35,10 +43,10 @@ class SocialMatrix:
         """
         Registra una interacción observable y actualiza la matriz relacional basada en evidencia.
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_conn()
         cursor = conn.cursor()
 
-        # Recuperar estado previo si existe
+        # Recuperar estado previo
         cursor.execute("""
             SELECT trust, conflict, affinity FROM social_matrix 
             WHERE agent_source = ? AND agent_target = ?
@@ -57,7 +65,6 @@ class SocialMatrix:
             new_conflict = max(0.0, curr_conflict - 0.1)
             new_affinity = min(1.0, curr_affinity + 0.05)
         else:
-            # Penalización asimétrica por incumplimiento (la confianza cae más rápido de lo que sube)
             new_trust = max(0.0, curr_trust - (alpha * 2.5 * curr_trust))
             new_conflict = min(1.0, curr_conflict + 0.3 + conflict_delta)
             new_affinity = max(0.0, curr_affinity - 0.2)
@@ -75,7 +82,10 @@ class SocialMatrix:
         """, (agent_source, agent_target, round(new_trust, 4), round(new_conflict, 4), round(new_affinity, 4), timestamp))
 
         conn.commit()
-        conn.close()
+        cursor.close()
+
+        # Invalidar caché local
+        self._cache.pop((agent_source, agent_target), None)
 
         return {
             "source": agent_source,
@@ -86,18 +96,22 @@ class SocialMatrix:
         }
 
     def evaluate_relationship(self, agent_source, agent_target):
-        """Consulta la postura social y calcula el riesgo de interacción."""
-        conn = sqlite3.connect(self.db_path)
+        """Consulta la postura social y calcula el riesgo de interacción con soporte de caché."""
+        cache_key = (agent_source, agent_target)
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        conn = self._get_conn()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT trust, conflict, affinity, last_updated FROM social_matrix 
             WHERE agent_source = ? AND agent_target = ?
         """, (agent_source, agent_target))
         row = cursor.fetchone()
-        conn.close()
+        cursor.close()
 
         if not row:
-            return {
+            result = {
                 "source": agent_source,
                 "target": agent_target,
                 "trust": 0.5,
@@ -106,10 +120,11 @@ class SocialMatrix:
                 "stance": "NEUTRAL",
                 "interaction_risk": 0.25
             }
+            self._cache[cache_key] = result
+            return result
 
         trust, conflict, affinity = row[0], row[1], row[2]
         
-        # Clasificación de postura relacional
         if conflict > 0.6:
             stance = "HOSTILE_OR_COMPETITIVE"
         elif trust > 0.75 and conflict < 0.2:
@@ -121,7 +136,7 @@ class SocialMatrix:
 
         risk = round((1.0 - trust) * 0.6 + conflict * 0.4, 3)
 
-        return {
+        result = {
             "source": agent_source,
             "target": agent_target,
             "trust": trust,
@@ -131,6 +146,8 @@ class SocialMatrix:
             "interaction_risk": risk,
             "last_updated": row[3]
         }
+        self._cache[cache_key] = result
+        return result
 
 if __name__ == "__main__":
     sm = SocialMatrix()

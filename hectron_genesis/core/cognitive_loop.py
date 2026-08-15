@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # HECTRON-01: cognitive_loop.py
-# Núcleo del ciclo de control cognitivo cerrado (BrainOS + MemoryOS + ASTAROTH + SocialMatrix + LlamaEngine)
+# Núcleo del ciclo de control cognitivo cerrado Optimizado (High-Throughput / Sub-millisecond Event Queue)
 
 import time
 import uuid
 import sqlite3
 import os
 import json
+import threading
+import queue
 from datetime import datetime
 from .llm_router import LLMRouter
 from .memory_os import MemoryOS
 from .social_matrix import SocialMatrix
+from .db_bootstrap import get_optimized_connection
 
 class CognitiveLoop:
     def __init__(self, agent_id="HECTRON_CORE_01"):
@@ -20,31 +23,74 @@ class CognitiveLoop:
         self.memory_os = MemoryOS()
         self.social_matrix = SocialMatrix()
         self.db_path = os.path.join(os.getcwd(), "hectron_genesis/data/hectron_core.db")
+        
+        # Cola asíncrona de eventos para no bloquear el ciclo de inferencia
+        self._event_queue = queue.Queue(maxsize=1000)
+        self._db_worker_thread = threading.Thread(target=self._event_flusher_worker, daemon=True)
+        self._db_worker_thread.start()
+
+        # Métricas de Telemetría del Sistema
+        self.telemetry = {
+            "cycle_count": 0,
+            "avg_latency_ms": 0.0,
+            "astaroth_avg_score": 1.0,
+            "last_tick_time": time.time()
+        }
+
+    def _event_flusher_worker(self):
+        """Worker en segundo plano para volcar eventos por lotes (Batch Insert)."""
+        conn = get_optimized_connection(self.db_path)
+        while self.running:
+            try:
+                events_batch = []
+                # Obtener primer elemento bloqueante
+                item = self._event_queue.get(timeout=1.0)
+                events_batch.append(item)
+                
+                # Obtener elementos acumulados
+                while not self._event_queue.empty() and len(events_batch) < 50:
+                    events_batch.append(self._event_queue.get_nowait())
+
+                if events_batch:
+                    cursor = conn.cursor()
+                    cursor.executemany("""
+                        INSERT INTO event_log (event_id, timestamp, agent_id, event_type, payload, trace_id, source)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, events_batch)
+                    conn.commit()
+                    cursor.close()
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"[!] Error en batch flusher: {e}")
+                time.sleep(0.5)
+        conn.close()
 
     def _log_event(self, event_type, payload, trace_id):
+        event_tuple = (
+            str(uuid.uuid4()),
+            datetime.utcnow().isoformat(),
+            self.agent_id,
+            event_type,
+            str(payload),
+            trace_id,
+            "CognitiveLoop"
+        )
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO event_log (event_id, timestamp, agent_id, event_type, payload, trace_id, source)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (str(uuid.uuid4()), datetime.utcnow().isoformat(), self.agent_id, event_type, str(payload), trace_id, "CognitiveLoop"))
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            print(f"[!] Error logueando evento: {e}")
+            self._event_queue.put_nowait(event_tuple)
+        except queue.Full:
+            pass
 
     def observe(self):
         """Etapa 1: Captura de entradas del entorno y telemetría de agentes."""
         timestamp = datetime.utcnow().isoformat()
-        obs = {
+        return {
             "timestamp": timestamp,
             "status": "nominal",
             "ambient_state": "active_economy",
             "network_nodes_observed": 5,
             "external_events": ["market_tick", "social_exchange"]
         }
-        return obs
 
     def remember(self, observation):
         """Etapa 2: Recuperación selectiva desde MemoryOS (episódica, social, procedimental)."""
@@ -63,8 +109,6 @@ class CognitiveLoop:
                   "Calcula el riesgo operacional y define la hipótesis táctica.")
         
         llm_result = self.router.query(prompt, max_tokens=180)
-        
-        # Cálculo de poder estructural del agente en este ciclo
         structural_power = self.social_matrix.calculate_structural_power(0.85, 0.70, 0.80, 0.65)
         
         return {
@@ -92,7 +136,8 @@ class CognitiveLoop:
                 "action": "HALT_AND_REASSESS",
                 "reason": "ASTAROTH_CONTRADICTION_DETECTED",
                 "details": verification["contradictions"],
-                "requires_auth": True
+                "requires_auth": True,
+                "astaroth_score": verification["reliability_score"]
             }
 
         return {
@@ -105,9 +150,7 @@ class CognitiveLoop:
     def act(self, decision):
         """Etapa 5: Ejecución controlada y trazabilidad inmutable."""
         trace_id = f"trc_{uuid.uuid4().hex[:8]}"
-        print(f"[TRACE {trace_id}] Acción decidida: {decision['action']}")
         
-        # Si la acción implica interacción social, registrar en la matriz
         if "STRATEGIC_TRANSACTION" in decision["action"]:
             self.social_matrix.record_interaction(
                 agent_source=self.agent_id,
@@ -116,7 +159,6 @@ class CognitiveLoop:
                 resource_exchanged=50.0
             )
 
-        # Grabar en Memoria Episódica persistente
         self.memory_os.store_memory(
             agent_id=self.agent_id,
             content=f"Ejecutada acción {decision['action']} con score ASTAROTH {decision.get('astaroth_score', 1.0)}",
@@ -129,19 +171,34 @@ class CognitiveLoop:
         return trace_id
 
     def tick(self):
-        """Ejecución de un ciclo cognitivo completo."""
+        """Ejecución de un ciclo cognitivo completo con medición de rendimiento."""
+        start = time.time()
         obs = self.observe()
         mem = self.remember(obs)
         inf = self.infer(obs, mem)
         dec = self.decide(inf, obs, mem)
-        self.act(dec)
+        trace_id = self.act(dec)
+        duration_ms = (time.time() - start) * 1000.0
+
+        # Actualizar telemetría
+        self.telemetry["cycle_count"] += 1
+        n = self.telemetry["cycle_count"]
+        self.telemetry["avg_latency_ms"] = round(((self.telemetry["avg_latency_ms"] * (n - 1)) + duration_ms) / n, 2)
+        self.telemetry["astaroth_avg_score"] = dec.get("astaroth_score", 1.0)
+        self.telemetry["last_tick_time"] = time.time()
+
+        # Decaimiento periódico de memoria cada 10 ciclos
+        if n % 10 == 0:
+            self.memory_os.consolidate_and_decay(self.agent_id)
+
+        return trace_id, duration_ms
 
     def run(self, cycles=3):
-        print(f"[*] Iniciando ciclo cognitivo persistente HECTRON-Ψ para: {self.agent_id}")
+        print(f"[*] Iniciando ciclo cognitivo optimizado HECTRON-Ψ para: {self.agent_id}")
         for i in range(cycles):
-            print(f"\n--- Ticker Ciclo [{i+1}/{cycles}] ---")
-            self.tick()
-            time.sleep(1)
+            trace_id, latency = self.tick()
+            print(f"--- Ticker [{i+1}/{cycles}] | Trace: {trace_id} | Latencia: {latency:.2f}ms | ASTAROTH: {self.telemetry['astaroth_avg_score']} ---")
+            time.sleep(0.5)
 
 if __name__ == "__main__":
     loop = CognitiveLoop()

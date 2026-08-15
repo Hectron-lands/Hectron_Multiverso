@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 # HECTRON-01: db_bootstrap.py
-# Inicialización de esquemas SQLite para MemoryOS y Event Bus
+# Inicialización de esquemas SQLite optimizados para MemoryOS y Event Bus (WAL + Índices)
 
 import sqlite3
 import os
 
-# Ajustado para el workspace local
 DB_PATH = os.path.join(os.getcwd(), "hectron_genesis/data/hectron_core.db")
 
 SCHEMA_SQL = """
+-- Configuración de Alto Rendimiento para SQLite en Edge/ARM
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA temp_store = MEMORY;
+PRAGMA cache_size = -64000;
+PRAGMA mmap_size = 268435456;
+
 -- Registro inmutable de eventos (Event Bus / Trace)
 CREATE TABLE IF NOT EXISTS event_log (
     event_id TEXT PRIMARY KEY,
@@ -54,16 +60,36 @@ CREATE TABLE IF NOT EXISTS governance_audit (
     policy_version TEXT NOT NULL,
     reason TEXT NOT NULL
 );
+
+-- Índices de Alto Rendimiento para Consultas Rápidas (Sub-milimétricas)
+CREATE INDEX IF NOT EXISTS idx_event_timestamp ON event_log(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_event_agent ON event_log(agent_id, event_type);
+CREATE INDEX IF NOT EXISTS idx_memory_agent_type ON memory_store(agent_id, type, confidence, salience);
+CREATE INDEX IF NOT EXISTS idx_memory_salience ON memory_store(salience DESC, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_social_source ON social_matrix(agent_source, trust);
 """
+
+def get_optimized_connection(db_path=DB_PATH):
+    """Crea una conexión SQLite con parámetros de rendimiento ultra-rápidos."""
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA journal_mode = WAL;")
+    cursor.execute("PRAGMA synchronous = NORMAL;")
+    cursor.execute("PRAGMA temp_store = MEMORY;")
+    cursor.execute("PRAGMA cache_size = -64000;")
+    cursor.execute("PRAGMA mmap_size = 268435456;")
+    cursor.close()
+    return conn
 
 def init_database():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_optimized_connection(DB_PATH)
     cursor = conn.cursor()
     cursor.executescript(SCHEMA_SQL)
     conn.commit()
     conn.close()
-    print(f"[+] Base de datos SQLite inicializada en: {DB_PATH}")
+    print(f"[+] Base de datos SQLite optimizada (WAL + Índices) inicializada en: {DB_PATH}")
 
 if __name__ == "__main__":
     init_database()

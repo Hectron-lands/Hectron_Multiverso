@@ -38,17 +38,20 @@ class EcsEngine {
     
     private val _renderState = MutableStateFlow<RenderState?>(null)
     val renderState: StateFlow<RenderState?> = _renderState.asStateFlow()
+
+    private val _telemetry = MutableStateFlow(EngineTelemetry())
+    val telemetry: StateFlow<EngineTelemetry> = _telemetry.asStateFlow()
     
     private var simulationJob: Job? = null
+    private val entityNames = mutableMapOf<Entity, String>()
     
     fun initializePopulation(count: Int) {
-        logEvent("Initializing World with Genesis Engine...")
+        logEvent("Initializing World with Genesis Engine (Optimized)...")
         val genesis = com.example.world.genesis.GenesisEngine()
         val worldData = genesis.generateWorld()
         
         logEvent("Generated ${worldData.cities.size} cities, ${worldData.buildings.size} buildings, and ${worldData.citizens.size} citizens.")
         
-        // Populate pathfinding network
         val nodesMap = mutableMapOf<Int, com.example.world.genesis.generators.RoadNode>()
         worldData.cities.forEach { city ->
             nodesMap[city.id] = com.example.world.genesis.generators.RoadNode(city.id, city.x, city.y)
@@ -56,8 +59,6 @@ class EcsEngine {
         this.roadNodes = nodesMap
         this.roads = worldData.roads
 
-        // We'll limit to a subset of citizens for the UI performance if there are too many, but ECS can handle them.
-        // Let's cap at 50 for the UI visualization limit.
         val citizensToSimulate = worldData.citizens.take(50)
         
         for (citizen in citizensToSimulate) {
@@ -65,44 +66,67 @@ class EcsEngine {
             transforms.add(entity, Transform((0..100).random().toFloat(), (0..100).random().toFloat(), 0f, 0f))
             velocities.add(entity, Velocity(0f, 0f, 0f))
             
-            // Map Genesis Citizen data to ECS Components
             needs.add(entity, Needs(citizen.hunger, 100f, citizen.energy, 100f, 100f, citizen.happiness, 0f))
             brains.add(entity, Brain("Idle", emptyList()))
             memories.add(entity, Memory())
             
-            // Assign Economy components
             inventories.add(entity, Inventory(citizen.money))
             if (citizen.companyId != null) {
                 val resource = listOf("iron", "gold", "energy", "crystal").random()
                 professions.add(entity, Profession(citizen.companyId!!, 500f, "Worker", 1f, resource))
             }
             
-            // Add Navigation component
             navigations.add(entity, Navigation(emptyList(), 0))
-            
-            // We can store the name in the ECS somehow, but for now we'll just update profiles with it.
-            // A NameComponent would be better, but we can hack it via a map for the UI.
             entityNames[entity] = "${citizen.firstName} ${citizen.lastName}"
         }
         updateProfiles()
     }
     
-    private val entityNames = mutableMapOf<Entity, String>()
-    
     fun startSimulation() {
         if (simulationJob?.isActive == true) return
-        logEvent("Simulation started.")
+        logEvent("Optimized simulation loop started (Target: 60 FPS / 16ms tick budget).")
         
         simulationJob = CoroutineScope(Dispatchers.Default).launch {
             var lastTime = System.currentTimeMillis()
+            var frameCount = 0
+            var fpsTimer = System.currentTimeMillis()
+            
             while (true) {
                 val currentTime = System.currentTimeMillis()
-                val delta = (currentTime - lastTime) / 1000f // in seconds
+                val delta = (currentTime - lastTime) / 1000f
                 lastTime = currentTime
                 
+                val tickStart = System.nanoTime()
                 tick(delta)
+                val tickDurationMs = (System.nanoTime() - tickStart) / 1_000_000f
+
+                frameCount++
+                if (currentTime - fpsTimer >= 1000L) {
+                    val currentFps = (frameCount * 1000f) / (currentTime - fpsTimer)
+                    val activeCount = transforms.entries().size
+                    
+                    // ASTAROTH avg reliability across brains
+                    var totalRel = 0f
+                    var brainCount = 0
+                    for ((_, b) in brains.entries()) {
+                        totalRel += b.verification.reliabilityScore
+                        brainCount++
+                    }
+                    val avgRel = if (brainCount > 0) totalRel / brainCount else 1.0f
+
+                    _telemetry.value = EngineTelemetry(
+                        fps = (currentFps * 10).toInt() / 10f,
+                        tickDurationMs = (tickDurationMs * 100).toInt() / 100f,
+                        activeEntities = activeCount,
+                        astarothReliability = (avgRel * 100).toInt() / 100f,
+                        memoryFootprintMb = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024f * 1024f),
+                        sovereigntyLevel = 4
+                    )
+                    frameCount = 0
+                    fpsTimer = currentTime
+                }
                 
-                delay(100L) // 10 ticks per second
+                delay(16L) // ~60 FPS smooth tick rate
             }
         }
     }
@@ -122,7 +146,6 @@ class EcsEngine {
         economySystem.update(inventories, professions, needs, delta) { wealth, unemployment, employed ->
             logEvent("ECONOMY REPORT: Global Wealth: $wealth, Unemployment: ${unemployment * 100}%")
             
-            // Trigger Telemetry if unemployment is critical
             if (unemployment > 0.5f) {
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
@@ -150,7 +173,6 @@ class EcsEngine {
         
         metaBrainSystem.update(needs, delta) { eventMsg ->
             logEvent(eventMsg)
-            // Fire telemetry event to Autonomy Node.js Server
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     com.example.network.NetworkModule.autonomyApi.sendTelemetry(
@@ -162,15 +184,12 @@ class EcsEngine {
                             populationImpacted = needs.entries().size
                         )
                     )
-                } catch (e: Exception) {
-                    // Fail silently if backend is offline to prevent crashing the Android simulation
-                }
+                } catch (e: Exception) {}
             }
         }
         
-        // Update UI state occasionally
         val now = System.currentTimeMillis()
-        if (now - uiUpdateTimer > 100) {
+        if (now - uiUpdateTimer > 66) { // Throttled ~15 Hz UI sync to save CPU & avoid GC thrashing
             updateProfiles()
             updateRenderState()
             uiUpdateTimer = now
@@ -178,8 +197,9 @@ class EcsEngine {
     }
     
     private fun updateRenderState() {
-        val entities = mutableListOf<RenderEntity>()
-        for ((entity, transform) in transforms.entries()) {
+        val entries = transforms.entries()
+        val entities = ArrayList<RenderEntity>(entries.size)
+        for ((entity, transform) in entries) {
             val prof = professions.get(entity)
             val n = needs.get(entity)
             entities.add(
@@ -196,13 +216,14 @@ class EcsEngine {
     }
     
     private fun updateProfiles() {
-        val list = mutableListOf<EntityProfile>()
-        for ((entity, _) in brains.entries()) {
+        val brainEntries = brains.entries()
+        val list = ArrayList<EntityProfile>(brainEntries.size)
+        for ((entity, brain) in brainEntries) {
             list.add(
                 EntityProfile(
                     id = entity,
                     name = entityNames[entity] ?: "Citizen #$entity",
-                    brain = brains.get(entity)?.copy(),
+                    brain = brain.copy(),
                     needs = needs.get(entity)?.copy()
                 )
             )
@@ -213,7 +234,7 @@ class EcsEngine {
     private fun logEvent(msg: String) {
         val current = _engineLog.value.toMutableList()
         current.add(0, msg)
-        if (current.size > 20) current.removeLast()
+        if (current.size > 25) current.removeLast()
         _engineLog.value = current
     }
 }

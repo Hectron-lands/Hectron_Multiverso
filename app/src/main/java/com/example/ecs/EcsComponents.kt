@@ -89,3 +89,12 @@ data class EntityProfile(
     val brain: Brain?,
     val needs: Needs?
 )
+
+data class EngineTelemetry(
+    val fps: Float = 60.0f,
+    val tickDurationMs: Float = 1.2f,
+    val activeEntities: Int = 0,
+    val astarothReliability: Float = 1.0f,
+    val memoryFootprintMb: Float = 12.4f,
+    val sovereigntyLevel: Int = 4
+)

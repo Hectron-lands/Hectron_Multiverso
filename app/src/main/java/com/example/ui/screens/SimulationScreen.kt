@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -26,13 +25,14 @@ fun SimulationScreen(ecsViewModel: EcsViewModel = viewModel()) {
     val profiles by ecsViewModel.engine.profiles.collectAsState()
     val engineLog by ecsViewModel.engine.engineLog.collectAsState()
     val renderState by ecsViewModel.engine.renderState.collectAsState()
+    val telemetry by ecsViewModel.engine.telemetry.collectAsState()
     
     var isRunning by remember { mutableStateOf(true) }
 
     Scaffold(
         containerColor = BgDark,
         topBar = {
-            CustomHeader(universeName = "ECS Engine v2")
+            CustomHeader(universeName = "HECTRON-Ψ Engine (Optimized)")
         },
         floatingActionButton = {
             FloatingActionButton(
@@ -55,31 +55,73 @@ fun SimulationScreen(ecsViewModel: EcsViewModel = viewModel()) {
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
+            // Live Performance & Sovereignty Telemetry HUD
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(SurfaceDark)
+                    .border(1.dp, Cyan400.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                    .padding(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("ENGINE FPS", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text("${telemetry.fps}", style = MaterialTheme.typography.titleMedium, color = Cyan400, fontWeight = FontWeight.Bold)
+                    }
+                    Column {
+                        Text("TICK LATENCY", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text("${telemetry.tickDurationMs} ms", style = MaterialTheme.typography.titleMedium, color = if (telemetry.tickDurationMs > 16) ErrorColor else NeonGreen, fontWeight = FontWeight.Bold)
+                    }
+                    Column {
+                        Text("ASTAROTH INDEX", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text("${(telemetry.astarothReliability * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, color = Purple600, fontWeight = FontWeight.Bold)
+                    }
+                    Column {
+                        Text("SOVEREIGNTY", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Text("Lvl ${telemetry.sovereigntyLevel}", style = MaterialTheme.typography.titleMedium, color = GoldAccent, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // Visual Simulation Map
             Text("LIVE UNIVERSE MAP", style = MaterialTheme.typography.labelSmall, color = Cyan400)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             com.example.ui.components.SimulationViewer(
                 renderState = renderState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(240.dp)
+                    .height(210.dp)
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // MetaBrain Log (The Emergence Engine)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                    .height(130.dp)
+                    .clip(RoundedCornerShape(20.dp))
                     .background(SurfaceDark)
-                    .border(1.dp, OutlineDark, RoundedCornerShape(24.dp))
-                    .padding(16.dp)
+                    .border(1.dp, OutlineDark, RoundedCornerShape(20.dp))
+                    .padding(14.dp)
             ) {
                 Column {
-                    Text("METABRAIN LOG", style = MaterialTheme.typography.labelSmall, color = Cyan400)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("METABRAIN LOG", style = MaterialTheme.typography.labelSmall, color = Cyan400)
+                        Text("ENTITIES: ${telemetry.activeEntities}", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
                     LazyColumn(reverseLayout = false, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         items(engineLog) { log ->
                             Text("> $log", style = MaterialTheme.typography.bodyMedium, color = if (log.contains("META-EMERGENCE")) GoldAccent else TextSecondary)
@@ -88,14 +130,14 @@ fun SimulationScreen(ecsViewModel: EcsViewModel = viewModel()) {
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text("POPULATION (${profiles.size})", style = MaterialTheme.typography.labelSmall, color = Cyan400)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 100.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 90.dp)
             ) {
                 items(profiles) { profile ->
                     Box(
@@ -104,7 +146,7 @@ fun SimulationScreen(ecsViewModel: EcsViewModel = viewModel()) {
                             .clip(RoundedCornerShape(16.dp))
                             .background(SurfaceVariantDark)
                             .border(1.dp, OutlineDark, RoundedCornerShape(16.dp))
-                            .padding(16.dp)
+                            .padding(14.dp)
                     ) {
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -113,7 +155,7 @@ fun SimulationScreen(ecsViewModel: EcsViewModel = viewModel()) {
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text("Current Goal: ${profile.brain?.currentGoal ?: "None"}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 val hunger = profile.needs?.hunger ?: 0f
                                 val energy = profile.needs?.energy ?: 0f
