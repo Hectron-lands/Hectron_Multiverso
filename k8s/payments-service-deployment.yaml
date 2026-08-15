@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-service
+  namespace: hectron
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payments-service
+  template:
+    metadata:
+      labels:
+        app: payments-service
+    spec:
+      containers:
+      - name: payments-service
+        image: gcr.io/abadalabs-hectron-prod/hectron-payments-service:latest
+        ports:
+        - containerPort: 3005
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments-service
+  namespace: hectron
+spec:
+  selector:
+    app: payments-service
+  ports:
+  - port: 3005
+    targetPort: 3005
+  type: ClusterIP
