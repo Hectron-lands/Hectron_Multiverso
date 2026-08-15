@@ -1,0 +1,17 @@
+{
+  "name": "local-agent",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs"
+  },
+  "dependencies": {
+    "@google-cloud/bigquery": "^6.10.0",
+    "axios": "^1.6.2",
+    "ws": "^8.15.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
