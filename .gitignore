@@ -1,18 +1,45 @@
-*.iml
-.gradle
-.kotlin
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+# Dependencies
+node_modules/
+api/**/node_modules/
+local-agent/node_modules/
+
+# Environment
+.env*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-.env
-debug.keystore
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build
+dist/
+build/
+
+# Test
+coverage/
+
+# Temp
+tmp/
+*.tmp
+
+# Credentials
+*.json.key
+*.pem
+service-account.json
+
+# Cloud
+.terraform/
+*.tfstate
+
+# Git
+.git/
