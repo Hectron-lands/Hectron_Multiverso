@@ -1,0 +1,11 @@
+name: Deploy to Production
+on:
+  push:
+    branches: [ main, prod ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Deploy
+      run: echo "Production deployment triggered"
