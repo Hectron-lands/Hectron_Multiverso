@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "HECTRON MULTIVERSO - Autonomous Virtual Universe Streaming System",
   "private": true,
-  "workspaces": ["api/*", "local-agent"],
+  "workspaces": ["api/*"],
   "scripts": {
     "dev": "concurrently \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:universe\" \"npm run start:autonomy\" \"npm run start:metrics\" \"npm run start:payments\" \"npm run start:gamification\"",
     "start": "concurrently \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:universe\" \"npm run start:autonomy\" \"npm run start:metrics\" \"npm run start:payments\" \"npm run start:gamification\"",
