@@ -1,0 +1,22 @@
+{
+  "name": "hectron-multiverso",
+  "version": "2.0.0",
+  "description": "HECTRON MULTIVERSO - Autonomous Virtual Universe Streaming System",
+  "private": true,
+  "workspaces": ["api/*", "local-agent"],
+  "scripts": {
+    "dev": "concurrently \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:universe\" \"npm run start:autonomy\" \"npm run start:metrics\" \"npm run start:payments\" \"npm run start:gamification\"",
+    "start": "concurrently \"npm run start:gateway\" \"npm run start:auth\" \"npm run start:universe\" \"npm run start:autonomy\" \"npm run start:metrics\" \"npm run start:payments\" \"npm run start:gamification\"",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "Abadalabs, Inc.",
+  "license": "MIT"
+}
