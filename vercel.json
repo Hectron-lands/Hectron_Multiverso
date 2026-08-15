@@ -1,4 +1,6 @@
 {
   "nodeVersion": "20.x",
-  "installCommand": "npm install --ignore-scripts"
+  "installCommand": "npm install --ignore-scripts --no-optional",
+  "buildCommand": "npm run build || echo 'No build script found'",
+  "outputDirectory": "api"
 }
