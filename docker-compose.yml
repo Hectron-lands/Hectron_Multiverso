@@ -1,0 +1,51 @@
+version: '3.8'
+services:
+  api-gateway:
+    build: { context: ., dockerfile: api/gateway/Dockerfile }
+    ports: ["3000:3000"]
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+    depends_on: [auth-service, universe-service, autonomy-service, metrics-service, payments-service, gamification-service]
+  auth-service:
+    build: { context: ., dockerfile: api/auth-service/Dockerfile }
+    ports: ["3003:3003"]
+    environment:
+      - AUTH_PORT=3003
+      - NODE_ENV=development
+  universe-service:
+    build: { context: ., dockerfile: api/universe-service/Dockerfile }
+    ports: ["3002:3002"]
+    environment:
+      - UNIVERSE_PORT=3002
+      - NODE_ENV=development
+  autonomy-service:
+    build: { context: ., dockerfile: api/autonomy-service/Dockerfile }
+    ports: ["3001:3001"]
+    environment:
+      - AUTONOMY_PORT=3001
+      - NODE_ENV=development
+  metrics-service:
+    build: { context: ., dockerfile: api/metrics-service/Dockerfile }
+    ports: ["3004:3004"]
+    environment:
+      - METRICS_PORT=3004
+      - NODE_ENV=development
+  payments-service:
+    build: { context: ., dockerfile: api/payments-service/Dockerfile }
+    ports: ["3005:3005"]
+    environment:
+      - PAYMENTS_PORT=3005
+      - NODE_ENV=development
+  gamification-service:
+    build: { context: ., dockerfile: api/gamification-service/Dockerfile }
+    ports: ["3006:3006"]
+    environment:
+      - GAMIFICATION_PORT=3006
+      - NODE_ENV=development
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports: ["5672:5672", "15672:15672"]
