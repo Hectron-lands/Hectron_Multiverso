@@ -1,0 +1,13 @@
+# Ignorar directorios que causan problemas en Vercel
+local-agent/
+terraform/
+k8s/
+scripts/
+legal/
+locales/
+public/
+.github/
+docker-compose.yml
+*.md
+.vercelignore
+vercel.json
